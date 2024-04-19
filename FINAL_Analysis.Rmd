@@ -1,0 +1,770 @@
+---
+title: "GLR_ClassificationProject_Milestone#2"
+author: "Kendall Leonard"
+date: "2023-03-17"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r, warning=FALSE}
+library(tidyverse)
+```
+
+```{r}
+dino<-read_csv("https://raw.githubusercontent.com/k-leonard/dino/main/data.csv")
+weight<-read_csv("https://raw.githubusercontent.com/k-leonard/dino/main/Jurassic%20Park%20Extended%20Edition%20-%20Sheet1%20(4).csv")
+```
+```{r}
+dino <- merge(x=dino,y=weight, 
+             by="name", all.x=TRUE)
+```
+
+###	MERGING WITH CENTROIDS OF COUNTRIES
+```{r}
+dino$COUNTRY <- dino$lived_in
+
+dino<-dino%>%
+  mutate(COUNTRY=str_replace(COUNTRY, "USA", "United States"))
+
+dino<-dino%>%
+  mutate(COUNTRY=str_replace(COUNTRY, "Wales", "United Kingdom"))
+
+dino<-dino%>%
+  mutate(COUNTRY=str_replace(COUNTRY, "Russia", "Russian Federation"))
+```
+
+
+```{r}
+centroids <- read.csv("https://raw.githubusercontent.com/gavinr/world-countries-centroids/master/dist/countries.csv")
+#View(centroids)
+
+```
+
+
+```{r}
+dino <- merge(x=dino,y=centroids, 
+             by="COUNTRY", all.x=TRUE)
+str(dino)
+```
+
+
+
+```{r}
+sum(is.na(dino))
+dino[129,3]<-"carnivorous" #fixing a data mistake
+dino[153,3]<-"herbivorous" 
+dino[7,3]<-"herbivorous"
+
+dino[309,1]<-"USA"
+dino[309,4]<-"Late Cretaceous"
+dino[309,5]<-"USA"
+
+
+dino<-na.omit(dino)
+```
+
+#Datacleaning/Wrangling
+A summary:
+Everything in this dataset is a character, which means that there will be a lot of transformations. 
+
+First the length and weight need to be split from their units, and after double checking that all are in the same units, transform them into numbers with the unit in the column name.
+
+During this exploration and transformation, we discovered a strange issue, most likely with the original data collection, where the type of dinosaur was skipped and in its place was the length. It was during this that we discovered 17 na's in length alone, so that might have to be supplemented with outside data if we need more rows.
+
+After that, if we want to check to see if location plays a part, we need location to be a indicator This of course can be reversed at any point.
+
+We also need to change the diet column to be an indicator as well, as we cannot predict strings. 
+
+We also plan to split taxonomy, to see if any of those features are connected to the diet of the dinosaur. 
+
+It might be interesting to see if species are grouped together, but there are so many unique ones they are most likely not connect. Might be a furture avenue if needed.
+
+I think time period would also be interesting to explore.
+
+
+
+###Suplementing the data
+####Adding in weights
+We will be supplementing more data, so this is just the beginning. 
+
+
+
+###Turning Characters into Numbers
+```{r}
+length<-as.numeric(str_remove(dino$length,"m"))
+dino$length_in_m<-length
+```
+Will be turning new columns into numbers as well
+```{r}
+weights<-as.numeric(str_remove(dino$weightkg,"kg"))
+
+dino$weights_in_kg<-weights
+```
+
+##Turning Diet Into a Factor
+
+```{r}
+dino<-dino%>%
+  mutate(diet=str_replace(diet, "omnivorous", "carnivorous"))
+```
+
+```{r}
+
+uniDiet<-unique(dino$diet)
+dietDat<-matrix(0, nrow=284, ncol=length(uniDiet))
+colnames(dietDat)<-uniDiet
+
+for(i in 1:284){
+  for(j in 1:length(uniDiet)){
+    if(colnames(dietDat)[j] %in% str_split(dino$diet[i]," ", simplify = TRUE)){
+      dietDat[i, j]=1
+    }
+  }
+}
+dino<-dino%>%
+  cbind(dietDat)
+
+```
+
+```{r}
+write.csv(dino,file = "DinoEncyclopedia.csv")
+```
+
+##Turning num_peds Into a Factor
+```{r}
+unifeet<-unique(dino$num_of_ped)
+feetDat<-matrix(0, nrow=284, ncol=2)
+colnames(feetDat)<-c("Two", "Four")
+
+for(i in 1:284){
+  if(dino$num_of_ped[i]=="2"){
+    feetDat[i, 1]=1 
+  }
+  
+    if(dino$num_of_ped[i]=="4"){
+    feetDat[i, 2]=1 
+  }
+    
+    if(dino$num_of_ped[i]=="both"){
+      feetDat[i, 1]=1
+      feetDat[i, 2]=1
+    }
+}
+dino<-dino%>%
+  cbind(feetDat)
+
+```
+
+##Turning period Into a BINARY Factor
+Will Continue working on this
+```{r}
+guess<-as.data.frame(str_split(dino$period, " ", simplify = TRUE))
+time_period<-subset(guess, select=c("V1","V2"))
+dino$time_period<-paste(time_period$V1, "", time_period$V2)
+dino$time_period<-str_remove(dino$time_period," ")
+
+UniqueTime<-unique(dino$time_period)
+TimeData<-matrix(0, nrow=284, ncol= length(UniqueTime))
+colnames(TimeData)<-UniqueTime
+
+for (i in 1:284){
+  for (j in 1:length(UniqueTime)){
+    if(colnames(TimeData)[j] == dino$time_period[i]){
+      TimeData[i, j]= 1
+    }
+  }
+}
+
+dino<-dino%>%
+  cbind(TimeData)
+```
+
+
+# Questions of Interest:
+####### Can the length of the dinosaur in meters (length) accurately predict the diet of a dinosaur?
+	Variables: diet, length
+####### Which predictor results in the least amount of false positives when predicting the type of dinosaur?
+	variables:
+####### Is the place where the dinosaur lived (lived_in) or the time period when they lived (period) a better predictor of type of dinosaur?
+	Variables: period, lived_in, type
+
+
+
+
+#MILESTONE 2
+
+```{r}
+names(dino)[c(14,15,16,20,21,27,28,29,30,31,32)]
+```
+
+
+##Step 0
+```{r,warning=FALSE}
+library(GGally) 
+
+
+ggpairs(dino, columns=c(1,14,15,16,20,21,27),cardinality_threshold = 32, ggplot2::aes(colour = diet))
+```
+
+
+
+
+
+###  PART 2  ###
+
+### STEP 1 ###
+Response Variable: Diet of the dinosaur
+Categorical Feature: Time period, which is divided by Early and Late periods
+Numeric Feature: Weight, which is recorded in kg
+
+### STEP 2 ###
+```{r}
+## PARTITION DATA
+dinoVeggie<-dino%>%
+  filter(carnivorous==0)
+dim(dinoVeggie)
+
+dinoMeat<-dino%>%
+  filter(carnivorous==1)
+dim(dinoMeat)
+```
+
+
+```{r}
+## SAMPLE INDECES
+sample0<-sample(1:168, 118)
+sample1<-sample(1:116, 81)
+
+## TRAINING AND TESTING SETS
+trainStrat<-rbind(dinoVeggie[sample0, ],
+                  dinoMeat[sample1, ])
+
+testStrat<-rbind(dinoVeggie[-sample0, ],
+                  dinoMeat[-sample1, ])
+
+## PROPORITON OF OUTCOME
+mean(trainStrat$carnivorous)
+mean(testStrat$carnivorous)
+
+trainStrat$carnivorous <- as.numeric(as.factor(trainStrat$carnivorous))
+testStrat$carnivorous <- as.numeric(as.factor(testStrat$carnivorous))
+```
+
+
+###Caret
+```{r}
+library(caret)
+# Split the data into training and test set
+set.seed(314)
+caretSamp <- createDataPartition(dino$carnivorous , 
+                                        p = 0.55, #This amount gets us the most equal proportions
+                                        list = FALSE)
+
+## SPLIT TESTING AND TRAINING
+trainCaret  <- dino[caretSamp, ]%>%
+  select(c(15,16,20,21,22,23,24,25,27,28,29,30,31,32))
+
+str(trainCaret)
+
+testCaret <- dino%>%
+  select(c(15,16,20,21,22,23,24,25,27,28,29,30,31,32))
+
+
+## PROPORITON OF OUTCOME
+mean(trainCaret$carnivorous)
+mean(testCaret$carnivorous)
+```
+
+### STEP 3 ###
+```{r}
+library(class)
+trainFea<-trainCaret%>%
+  select(-c(carnivorous))
+dim(trainFea)
+
+testFea<-testCaret%>%
+  select(-c(carnivorous))
+dim(testFea)
+
+
+trainOut<-trainCaret$carnivorous
+testOut<-testCaret$carnivorous
+sum(is.na(trainFea))
+sum(is.na(testFea))
+sum(is.na(trainOut))
+set.seed(72)
+
+knn.pred=knn(train = trainFea,
+             test = testFea,
+             cl = trainOut,
+             k=3)
+
+head(knn.pred)
+
+
+```
+
+
+### STEP 4 ###
+### STEP 4A ###
+
+```{r}
+#Confusion matrix
+cm<-table(knn.pred,testOut)
+cm
+```
+
+### STEP 4B ###
+```{r}
+#correct rate
+
+mean(knn.pred==testOut)
+```
+
+### STEP 4C ###
+```{r}
+#error rate
+
+mean(knn.pred!=testOut)
+
+```
+### STEP 4D ###
+```{r}
+#false positive rate
+
+40/(40+128)
+```
+### STEP 4E ###
+```{r}
+#false negative rate
+
+27/(27+89)
+```
+
+### STEP 4F ###
+```{r}
+#sensitivity
+#Sensitivity = True Positive / (True Positive + False Negative)
+89/(89+27)
+
+```
+### STEP 4G ###
+```{r}
+#specificity
+#Specificity = True Negative / (False Positive + True Negative)
+
+128/(40+128)
+```
+
+
+### STEP 5 ###
+```{r}
+set.seed(123)
+error <- c()
+for (i in 1:30){
+  knnDino<- knn(train = trainFea,
+                test = testFea,
+                cl = trainOut, 
+                k = i)
+  error[i] = 1- mean(knnDino==testOut)
+}
+
+
+ggplot(data = data.frame(error), aes(x = 1:30, y = error)) +
+  geom_line(color = "Blue")+
+  xlab("Neighborhood Size")+
+  ggtitle("K Nearest Neighbor Grid Search")
+
+
+#The best knn model uses only one neighbor!
+which.min(error)
+min(error)
+```
+
+### STEP 6 ###
+```{r}
+knn.best=knn(train = trainFea,
+             test = testFea,
+             cl = trainOut,
+             k=1)
+```
+
+### STEP 6A ###
+```{r}
+#confusion matrix
+conf<-table(knn.best,testOut)
+conf
+```
+### STEP 6B ###
+```{r}
+#correct rate
+
+mean(knn.best==testOut)
+```
+### STEP 6C ###
+```{r}
+#error rate
+
+mean(knn.best!=testOut)
+
+```
+### STEP 6D ###
+```{r}
+#false positive rate
+#FP/FP+TN
+25/(25+143)
+```
+### STEP 6E ###
+```{r}
+#false negative rate
+#FN/FN+TN
+18/(18+143)
+```
+
+### STEP 6F ###
+```{r}
+#sensitivity
+#Sensitivity = True Positive / (True Positive + False Negative)
+98/(98+18)
+
+```
+### STEP 6G ###
+```{r}
+#specificity
+#Specificity = True Negative / (False Positive + True Negative)
+
+143/(143+25)
+```
+
+
+### STEP 6 (Caret) ###
+```{r}
+### THE CARET METHOD CARET
+set.seed(314)
+model <- train(
+  factor(carnivorous) ~., 
+  data = trainCaret , 
+  method = "knn",
+  trControl = trainControl("cv", number = 10),
+  preProcess = c("range"),
+  tuneLength = 20
+)
+# Plot model accuracy vs different values of k
+plot(model)
+
+model$bestTune
+
+predicted.classes <- model %>% predict(testCaret)
+head(predicted.classes)
+
+cmCaret<-table(predicted.classes ,testOut)
+cmCaret
+confusionMatrix(cmCaret)
+
+10/(10+158)
+4/(4+158)
+
+```
+
+###  PART 3  ###
+
+
+### Step 7 ###
+
+```{r}
+
+dinomod<-glm(carnivorous~weights_in_kg, data=dino, family="binomial")
+summary(dinomod)
+
+plot(dinomod)
+
+```
+### STEP 8 ###
+
+## On average, if a dinosaur weighed 0 kg, there is a 3.729e-01% chance of them being carnivorous, and for each additional kg they weigh, they are 4.061e-04% less likely  to be carnivorous.
+
+
+### STEP 9 ###
+
+```{r}
+
+### PREDICT
+dino_prob <- predict(dinomod, testFea, type = "response")
+head(dino_prob)
+
+```
+
+```{r}
+## THRESHOLD
+
+dino_pred<-ifelse(dino_prob>.5, "carnivorous", "herbivorous")
+
+```
+
+```{r}
+###  CONFUSION MATRIX
+table(dino_pred, testFea$herbivorous)
+
+## CORRECT RATE
+mean(dino_pred == testFea$herbivorous)
+
+sum(diag(table(dino_pred, testFea$herbivorous)))/sum(table(dino_pred, testFea$herbivorous))
+
+slope<-dinomod$coefficients[2]
+exp(slope)
+```
+
+```{r}
+30/(30+86)
+56/(56+86)
+```
+
+### STEP 10 ###
+
+```{r}
+
+fulldino<-glm(carnivorous~weights_in_kg+length_in_m+Two+Four+longitude+latitude+`Early Jurassic`+`Late Triassic`+`Late Cretaceous`+`Mid Jurassic`+`Early Cretaceous`+`Late Jurassic`, data=dino, family="binomial")
+summary(fulldino)
+
+dino_prob2 <- predict(fulldino, testFea, type = "response")
+head(dino_prob2)
+dino_pred2<-ifelse(dino_prob2>.5, "carnivorous", "herbivorous")
+###  CONFUSION MATRIX
+table(dino_pred2, testFea$herbivorous)
+
+## CORRECT RATE
+mean(dino_pred2 == testFea$herbivorous)
+
+sum(diag(table(dino_pred2, testFea$herbivorous)))/sum(table(dino_pred, testFea$herbivorous))
+
+slope2<-dinomod2$coefficients[2]
+exp(slope2)
+```
+```{r}
+6/(6+110)
+37/(37+110)
+```
+
+### STEP 11 ###
+
+```{r}
+
+library(bestglm)
+?bestglm
+step(fulldino)
+
+```
+
+The final model had an AIC of 201.07 and included three variables. Those being : weight_in_kg, length_in_m, and "Four" (meaning 4 peds). What can be learned from this is that weight(kg), length(m), and having 4 feet are the best predictors to use when trying to predict whether a certain dinosaur is carnivorous or herbivorous.
+
+
+### STEP 12 ###
+
+```{r}
+### 
+dinomod2<-glm(carnivorous~weights_in_kg + length_in_m + Four, data=dino, family="binomial")
+summary(dinomod2)
+
+```
+
+```{r}
+
+### PREDICT
+dino_prob2 <- predict(dinomod2, testFea, type = "response")
+head(dino_prob2)
+
+```
+
+```{r}
+## THRESHOLD
+
+dino_pred2<-ifelse(dino_prob2>.5, "carnivorous", "herbivorous")
+
+```
+
+
+```{r}
+### confusion mat
+tabDino<-table(dino_pred2, testFea$herbivorous)
+tabDino
+
+
+## correct
+#mean(dino_pred2 == testFea$herbivorous)
+sum(diag(tabDino))/sum(tabDino)
+
+```
+
+
+Part IV: Trees!
+● Step 13: (10 points) Fit a classification tree to your training data. Create a tree diagram plot and describe patterns you observe.)
+### STEP 13 ###
+```{r}
+set.seed(314)
+library(rpart)
+
+classTree<- rpart(carnivorous~length_in_m+weights_in_kg,
+                  data = trainCaret,
+                  method = "class")
+
+### PLOT TREE
+library(rpart.plot)
+rpart.plot(classTree)
+
+```
+From the above plot, we can observe that the data weight and length of the dinosaur can predict what type of diet it has if you follow the flow of the tree correctly. I can see that the relationship between weight and length make sense with diet. If a dinosaur is bigger, it is more likely to eat meat than a smaller one. This obviously does not take into consideration scavengers or large plant based species but it follows that the bigger/stronger dinosaurs will eat meat.
+
+A classification tree shows the exploratory data analysis for us to make predictions of 
+
+### STEP 14 ###
+● Step 14: (10 points) Prune your tree by finding the CP that minimizes the error. Re-plot your tree.
+```{r}
+library(rpart.plot)
+
+### Plot CP
+plotcp(classTree)
+
+printcp(classTree)
+
+#don't want to over or under fit our trees
+
+plot
+## WHICH CP
+minCP<-classTree$cptable[which.min(classTree$cptable[,"xerror"]),"CP"]
+minCP
+prune_classTree <- prune(classTree, cp = minCP )
+rpart.plot(prune_classTree )
+```
+
+
+
+### STEP 15 ###
+● Step 15: (10 points) Create a confusion matrix for your tree using the testing data. Calculate the correct rate.
+```{r}
+## DEFAULT TREE 
+### PREDICT
+predTree1<-predict(classTree , testCaret, type="class")
+
+### CONFUSION MATRIX
+cmTree1<-table(testCaret$carnivorous, predTree1)
+cmTree1
+
+#### CORRECT RATE
+mean(testCaret$carnivorous==predTree1)
+
+## PRUNED TREE 
+### PREDICT
+predTree2<-predict(prune_classTree , testCaret, type="class")
+
+### CONFUSION MATRIX
+cmTree2<-table(testCaret$herbivorous, predTree2)
+cmTree2
+
+#### CORRECT RATE
+mean(testCaret$herbivorous==predTree2)
+
+### CONFUSION MATRIX
+#cmTree1<-table(predTree1, test27$y)
+#cmTree1
+
+## CORRECT RATE
+#mean(predTree1==test27$y)
+
+```
+### STEP 16 ###
+● Step 16: (10 points) Fit your favorite tree aggregation technique using the caret package. State the parameters for the best model and show the variable importance plot.
+```{r}
+library(tidyverse)
+
+### BAG
+
+trainCaret$carnivorous<-as.factor(trainCaret$carnivorous)
+set.seed(314)
+#caretBag <- train(carnivorous~.,
+                  #data=trainCaret,
+                 # method="treebag",
+                 # trControl=trainControl("cv", number=10),
+                 # importance=TRUE)
+##the caret method was throwing errors, so we used the other version
+#predCaretBag <- caretBag%>%
+  #predict(testCaret)
+
+# CONFUSION MATRIX
+#table(predCaretBag, testCaret$Two)
+
+# CORRECT RATE
+#mean(predCaretBag==testCaret$Two)
+
+#library(vip)
+#vip(caretBag)
+```
+
+```{r}
+### BAGGING
+library(caret)
+library(ipred)  #includes the bagging function 
+library(rpart)
+
+set.seed(252)
+dinoBag <-bagging(carnivorous ~ .,
+                   data = trainCaret%>%
+                    select(-c(herbivorous)),
+                   nbagg = 150,   
+                   coob = TRUE,
+                   control = rpart.control(minsplit = 2, cp = 0))
+
+##parameters for best model
+
+##variance importance plot
+library(vip)
+#vip(dinoBag)
+#vip package keeps throwing an error but we can assume there would be similarities between variable selection in bagging and the forward/backward selection
+
+```
+### STEP 17 ###
+● Step 17: (10 points) Create a confusion matrix for your tree aggregation using the testing data. Calculate the correct rate.
+```{r}
+## PREDICT
+preddinoo<-predict(dinoBag, testCaret, type="class")
+
+## CONFUSION MATRIX
+cmBag<-table(testCaret$carnivorous, preddinoo)
+cmBag
+
+## CORRECT RATE
+mean(testCaret$carnivorous==preddinoo)
+
+```
+
+### STEP 18 ###
+Part V: Compare
+● Step 18: (20 points) Create a table and compare your methods.
+```{r}
+
+
+##knn correct rate
+mean(knn.best==testOut)
+
+##logistic regression correct rate
+#mean(dino_pred2 == testFea$herbivorous)
+sum(diag(table(dino_pred2, testFea$herbivorous)))/sum(table(dino_pred2, testFea$herbivorous))
+##classification tree correct rate
+mean(testCaret$carnivorous==predTree1)
+
+##bagging correct rate
+mean(testCaret$carnivorous==preddinoo)
+
+
+```
+ Compare and contrast pros and cons of the methods. What did you learn from this exercise? Which would you choose?
+It seems that the most accurate method is the bagging aggregation method for the classification tree. 
+The biggest thing to learn from this exercise is that the accuracy of each of the methods and experimenting with all of them can help us see which method is going to give us the best results for our data.
+KNN is highly unbiased and makes no prior assumption of the underlying data. It is simple, effective and easy to implement. However, it is simplicity that is a con as well. With how simple it is, it can fail to go as in depth as other methods. In this case, it has the second highest accuracy of all the methods we tried. The biggest con of logistic regression is that it assumes linearity even if the data does not indicate that. Bagging is used to reduce the variance of a decision tree. While this had the highest accuracy rate, a downside to bagging is that it can be dominated by a moderately strong predictor which could be the case here with the diet variable.
+
+Pros and cons→ Trees can be very similar, Dominated by a few strong / moderately strong predictor, Bagged trees can be highly correlated, Does not lead to large reduction in variance when averaging  
+
+
+
+
+
